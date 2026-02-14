@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crystal-version: ['latest', '1.12.0', '1.11.0']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Crystal
+      uses: crystal-lang/setup-crystal@v1
+      with:
+        crystal-version: ${{ matrix.crystal-version }}
+
+    - name: Install dependencies
+      run: shards install
+
+    - name: Run tests
+      run: crystal spec
+
+    - name: Run Ameba linter
+      run: ameba
+
+    - name: Build binaries
+      run: shards build --release
+
+    - name: Test built binaries
+      run: |
+        ./bin/find_shard -h
+        ./bin/crystal_doc -h

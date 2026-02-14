@@ -1,0 +1,37 @@
+# Ameba configuration for Crystal Search project
+
+# Disable rules that are too strict for this project
+Naming/BlockParameterName:
+  Enabled: false
+
+Naming/QueryBoolMethods:
+  Enabled: false
+
+Style/RedundantReturn:
+  Enabled: false
+
+Style/RedundantNilInControlExpression:
+  Enabled: false
+
+Lint/UselessAssign:
+  Enabled: false
+
+Lint/NotNil:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Style/HeredocIndent:
+  Enabled: false
+
+Layout/TrailingWhitespace:
+  Enabled: false
+
+# Allow up to 200 lines per method
+Metrics/MethodLength:
+  MaxLength: 200
+
+# Allow up to 30 parameters
+Metrics/ParameterNumber:
+  Max: 30

@@ -1,0 +1,25 @@
+name: crystal_search
+version: 0.1.0
+
+authors:
+  - Dominic Sisneros <dsisnero@gmail.com>
+
+targets:
+  crystal_search:
+    main: src/crystal_search.cr
+  find_shard:
+    main: src/find_shard.cr
+  crystal_doc:
+    main: src/crystal_doc.cr
+
+crystal: '>= 1.19.1'
+dependencies:
+  lexbor:
+    github: kostya/lexbor
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: ~> 1.0
+
+license: MIT
