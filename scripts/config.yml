@@ -67,6 +67,17 @@ extension_patterns:
     - '*.asc'
     - '*.sig'
 
+  crystal:
+    - '*.cr'
+    - 'shard.yml'
+    - 'shard.lock'
+    - '*.shard'
+    - '*.crystal'
+
+  crystal_binary:
+    - '*.wasm'  # WebAssembly
+    - '*.bc'    # LLVM bitcode
+
 # Default settings
 defaults:
   # Required platforms (release will fail if artifacts missing)
@@ -86,3 +97,20 @@ defaults:
     timeout: 30
     retries: 3
     per_page: 100
+
+  # Crystal-specific settings
+  crystal:
+    # Whether to build executables (false for libraries)
+    build_executable: false
+
+    # Whether to create source archives
+    create_source_archive: true
+
+    # Crystal versions to test against
+    crystal_versions: ['latest']
+
+    # Whether to include nightly builds
+    include_nightly: false
+
+    # Whether to include edge shard configs
+    include_edge: false
