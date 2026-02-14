@@ -1,0 +1,382 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0, v2.1.0-beta.1)'
+        required: true
+        default: 'v1.0.0'
+      draft:
+        description: 'Create as draft release (requires manual publishing)'
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        default: false
+        type: boolean
+      skip_ci_check:
+        description: 'Skip CI status check (use with caution)'
+        required: false
+        default: false
+        type: boolean
+      source_branch:
+        description: 'Source branch for artifacts (default: main)'
+        required: false
+        default: 'main'
+      workflow_run:
+        description: 'Specific workflow run ID (optional, uses latest successful run if not specified)'
+        required: false
+
+# Optional: Require environment approval
+# environment:
+#   name: production
+#   url: https://github.com/${{ github.repository }}/releases
+
+concurrency:
+  group: manual-release-${{ github.event.inputs.version }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+
+    outputs:
+      tag_valid: ${{ steps.validate.outputs.tag_valid }}
+      tag: ${{ steps.validate.outputs.tag }}
+      ci_passed: ${{ steps.ci_check.outputs.ci_passed }}
+      normalized_tag: ${{ steps.normalize.outputs.normalized_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_branch }}
+          fetch-depth: 0
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+
+      - name: Validate version tag format
+        id: validate
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Validating version: $VERSION"
+
+          # Use determine_release_tag.rb to validate format
+          if ruby scripts/determine_release_tag.rb --tag "$VERSION" >/dev/null 2>&1; then
+            echo "✅ Valid version format"
+            echo "tag_valid=true" >> $GITHUB_OUTPUT
+            echo "tag=$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Invalid version format: $VERSION"
+            echo "tag_valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Normalize tag format
+        id: normalize
+        if: steps.validate.outputs.tag_valid == 'true'
+        run: |
+          TAG="${{ steps.validate.outputs.tag }}"
+          NORMALIZED=$(ruby scripts/determine_release_tag.rb --tag "$TAG" --normalize)
+          echo "Original tag: $TAG"
+          echo "Normalized tag: $NORMALIZED"
+          echo "normalized_tag=$NORMALIZED" >> $GITHUB_OUTPUT
+
+      - name: Check for existing release
+        id: check_existing
+        if: steps.validate.outputs.tag_valid == 'true'
+        run: |
+          TAG="${{ steps.normalize.outputs.normalized_tag }}"
+
+          # Check if release already exists using GitHub CLI
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "❌ Release $TAG already exists"
+            echo "Existing release URL:"
+            gh release view "$TAG" --json url --jq '.url'
+            exit 1
+          fi
+
+          echo "✅ No existing release for $TAG"
+
+      - name: Check CI status for source branch
+        id: ci_check
+        if: |
+          steps.validate.outputs.tag_valid == 'true' &&
+          github.event.inputs.skip_ci_check == false
+        run: |
+          echo "Checking CI status for branch: ${{ github.event.inputs.source_branch }}"
+
+          # Get latest commit on source branch
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "Checking CI status for commit: $COMMIT_SHA"
+
+          # Run CI status check
+          ruby scripts/check_ci_status.rb \
+            --repo ${{ github.repository }} \
+            --sha "$COMMIT_SHA" \
+            --token ${{ secrets.GITHUB_TOKEN }}
+
+          EXIT_CODE=$?
+
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ CI status: PASSED"
+            echo "ci_passed=true" >> $GITHUB_OUTPUT
+          elif [ $EXIT_CODE -eq 2 ]; then
+            echo "⚠️ CI status: PENDING"
+            echo "ci_passed=false" >> $GITHUB_OUTPUT
+            echo "Some CI checks are still running"
+            exit 1
+          else
+            echo "❌ CI status: FAILED"
+            echo "ci_passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  determine-artifact-source:
+    name: Determine Artifact Source
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      needs.validate.outputs.tag_valid == 'true' &&
+      (needs.validate.outputs.ci_passed == 'true' || github.event.inputs.skip_ci_check == true)
+
+    outputs:
+      workflow_run_id: ${{ steps.determine_run.outputs.workflow_run_id }}
+      artifact_count: ${{ steps.list_artifacts.outputs.artifact_count }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine workflow run for artifacts
+        id: determine_run
+        run: |
+          # Use provided workflow run ID or find latest successful run
+          if [ -n "${{ github.event.inputs.workflow_run }}" ]; then
+            RUN_ID="${{ github.event.inputs.workflow_run }}"
+            echo "Using provided workflow run: $RUN_ID"
+          else
+            # Find latest successful workflow run on source branch
+            echo "Finding latest successful workflow run on branch: ${{ github.event.inputs.source_branch }}"
+
+            # You may want to specify a particular workflow
+            # WORKFLOW_ID=$(gh workflow list --json id,name --jq '.[] | select(.name == "CI") | .id')
+
+            RUN_ID=$(gh run list \
+              --branch "${{ github.event.inputs.source_branch }}" \
+              --status success \
+              --limit 1 \
+              --json databaseId \
+              --jq '.[0].databaseId' \
+              2>/dev/null || echo "")
+
+            if [ -z "$RUN_ID" ]; then
+              echo "❌ No successful workflow runs found on branch ${{ github.event.inputs.source_branch }}"
+              exit 1
+            fi
+
+            echo "Found workflow run: $RUN_ID"
+          fi
+
+          echo "workflow_run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: List available artifacts
+        id: list_artifacts
+        run: |
+          RUN_ID="${{ steps.determine_run.outputs.workflow_run_id }}"
+
+          ARTIFACTS=$(gh api \
+            repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts \
+            --jq '.artifacts | length')
+
+          echo "Found $ARTIFACTS artifacts in workflow run $RUN_ID"
+          echo "artifact_count=$ARTIFACTS" >> $GITHUB_OUTPUT
+
+          # List artifact names
+          gh api \
+            repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts \
+            --jq '.artifacts[].name' | while read name; do
+              echo "  - $name"
+            done
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [validate, determine-artifact-source]
+    if: |
+      needs.validate.outputs.tag_valid == 'true' &&
+      (needs.validate.outputs.ci_passed == 'true' || github.event.inputs.skip_ci_check == true)
+
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+
+      - name: Install dependencies
+        run: |
+          gem install octokit faraday
+
+      - name: Collect artifacts
+        id: collect_artifacts
+        run: |
+          mkdir -p ./artifacts
+
+          echo "Collecting artifacts from workflow run ${{ needs.determine-artifact-source.outputs.workflow_run_id }}"
+
+          ruby scripts/collect_artifacts.rb \
+            --repo ${{ github.repository }} \
+            --workflow-run ${{ needs.determine-artifact-source.outputs.workflow_run_id }} \
+            --platforms linux,macos,windows \
+            --token ${{ secrets.GITHUB_TOKEN }} \
+            --output-dir ./artifacts
+
+          # Verify artifacts were collected
+          ARTIFACT_COUNT=$(ls -1 ./artifacts/ 2>/dev/null | wc -l)
+          echo "Collected $ARTIFACT_COUNT artifacts"
+
+          if [ "$ARTIFACT_COUNT" -eq 0 ]; then
+            echo "❌ No artifacts collected"
+            exit 1
+          fi
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Optional: Generate release notes from git history
+          # You could also use a CHANGELOG.md file
+          echo "Generating release notes..."
+
+          # Example: Get commits since last tag
+          # LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # if [ -n "$LAST_TAG" ]; then
+          #   git log --oneline --no-merges "$LAST_TAG..HEAD" > release_notes.txt
+          # else
+          #   git log --oneline --no-merges > release_notes.txt
+          # fi
+
+          # For now, create simple notes
+          cat > release_notes.txt <<EOF
+          # Release ${{ needs.validate.outputs.normalized_tag }}
+
+          Created via manual workflow dispatch.
+
+          ## Artifacts
+
+          This release includes artifacts for multiple platforms:
+          - Linux (x86_64)
+          - macOS (ARM64)
+          - Windows (x64)
+
+          ## Source
+
+          Branch: \`${{ github.event.inputs.source_branch }}\`
+          Workflow Run: ${{ needs.determine-artifact-source.outputs.workflow_run_id }}
+
+          EOF
+
+          echo "release_notes_generated=true" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub release
+        id: create_release
+        run: |
+          echo "Creating release ${{ needs.validate.outputs.normalized_tag }}"
+          echo "Draft: ${{ github.event.inputs.draft }}"
+          echo "Prerelease: ${{ github.event.inputs.prerelease }}"
+
+          ruby scripts/create_release.rb \
+            --repo ${{ github.repository }} \
+            --tag "${{ needs.validate.outputs.normalized_tag }}" \
+            --name "Release ${{ needs.validate.outputs.normalized_tag }}" \
+            --artifacts ./artifacts \
+            --draft ${{ github.event.inputs.draft }} \
+            --prerelease ${{ github.event.inputs.prerelease }} \
+            --token ${{ secrets.GITHUB_TOKEN }}
+
+          echo "Release created successfully"
+
+      - name: Output release URL
+        run: |
+          TAG="${{ needs.validate.outputs.normalized_tag }}"
+          URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+
+          if [ "${{ github.event.inputs.draft }}" = "true" ]; then
+            URL="https://github.com/${{ github.repository }}/releases/tag?name=$TAG"
+          fi
+
+          echo "🎉 Release created: $URL"
+          echo "::notice title=Release Created::Release $TAG created at $URL"
+
+      - name: Notify success
+        if: success()
+        run: |
+          # Optional: Send notifications
+          echo "Release workflow completed successfully"
+
+          # Example Slack notification
+          # if [ -n "$SLACK_WEBHOOK_URL" ]; then
+          #   curl -X POST $SLACK_WEBHOOK_URL \
+          #     -H 'Content-type: application/json' \
+          #     --data "{\"text\":\"Manual release \`${{ needs.validate.outputs.normalized_tag }}\` created by ${{ github.actor }}\"}"
+          # fi
+
+  # Optional: Post-release validation
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: always() && needs.create-release.result == 'success'
+
+    steps:
+      - name: Verify release exists
+        run: |
+          TAG="${{ needs.validate.outputs.normalized_tag }}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "✅ Release $TAG verified"
+
+            # Show release details
+            gh release view "$TAG" \
+              --json name,tagName,createdAt,assets \
+              --jq '.assets[].name'
+          else
+            echo "❌ Release $TAG not found"
+            exit 1
+          fi
+
+      - name: Test artifact downloads
+        run: |
+          # Download and verify one artifact
+          mkdir -p ./test-download
+
+          TAG="${{ needs.validate.outputs.normalized_tag }}"
+
+          # Download first artifact
+          gh release download "$TAG" \
+            --pattern '*.tar.gz' \
+            --dir ./test-download \
+            --clobber
+
+          echo "Downloaded artifacts:"
+          ls -la ./test-download/
+
+      - name: Cleanup test files
+        if: always()
+        run: |
+          rm -rf ./test-download

@@ -23,28 +23,28 @@ jobs:
           - os: windows-latest
             platform: windows
             artifact_suffix: windows-x64
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Crystal
         uses: crystal-lang/setup-crystal@v1
         with:
           crystal-version: 'latest'
-      
+
       - name: Install dependencies
         run: shards install
-      
+
       - name: Run tests
         run: crystal spec
-      
+
       - name: Run Ameba linter
         run: ameba
-      
+
       - name: Build release binaries
         run: shards build --release
-      
+
       - name: Create artifact directory
         run: |
           mkdir -p dist/${{ matrix.platform }}
@@ -52,7 +52,7 @@ jobs:
           cp bin/crystal_search dist/${{ matrix.platform }}/crystal_search
           cp bin/find_shard dist/${{ matrix.platform }}/find_shard
           cp bin/crystal_doc dist/${{ matrix.platform }}/crystal_doc
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

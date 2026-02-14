@@ -1,0 +1,88 @@
+# Platform detection patterns for artifact collection
+#
+# Patterns use fnmatch syntax (* matches any characters)
+# Case-insensitive matching
+
+platform_patterns:
+  linux:
+    - '*linux*'
+    - '*ubuntu*'
+    - '*debian*'
+    - '*rhel*'
+    - '*centos*'
+    - '*fedora*'
+    - '*alpine*'
+
+  macos:
+    - '*macos*'
+    - '*darwin*'
+    - '*mac*'
+    - '*osx*'
+    - '*apple*'
+
+  windows:
+    - '*windows*'
+    - '*win*'
+    - '*msvc*'
+    - '*mingw*'
+
+# Architecture patterns
+architecture_patterns:
+  x86_64:
+    - '*x86_64*'
+    - '*amd64*'
+    - '*x64*'
+
+  arm64:
+    - '*arm64*'
+    - '*aarch64*'
+    - '*armv8*'
+
+  i386:
+    - '*i386*'
+    - '*i686*'
+    - '*x86*'
+
+# File extension patterns
+extension_patterns:
+  archive:
+    - '*.zip'
+    - '*.tar.gz'
+    - '*.tgz'
+    - '*.tar.xz'
+    - '*.tar.bz2'
+
+  package:
+    - '*.deb'
+    - '*.rpm'
+    - '*.dmg'
+    - '*.pkg'
+    - '*.msi'
+    - '*.exe'
+
+  checksum:
+    - '*.sha256'
+    - '*.sha512'
+    - '*.md5'
+    - '*.asc'
+    - '*.sig'
+
+# Default settings
+defaults:
+  # Required platforms (release will fail if artifacts missing)
+  required_platforms: []
+
+  # Optional platforms (warning if missing)
+  optional_platforms: ['linux', 'macos', 'windows']
+
+  # Maximum artifact age in days (artifacts expire)
+  max_artifact_age: 90
+
+  # Temporary directory for downloads
+  temp_dir: '/tmp/github-artifacts'
+
+  # GitHub API settings
+  api:
+    timeout: 30
+    retries: 3
+    per_page: 100

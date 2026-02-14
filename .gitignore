@@ -3,3 +3,6 @@
 /bin/
 /.shards/
 *.dwarf
+
+# Build artifacts
+dist/
