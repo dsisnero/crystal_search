@@ -146,19 +146,20 @@ jobs:
 
           # Check if any files exist before creating checksums
           if [ "$(ls -A . 2>/dev/null | wc -l)" -gt 0 ]; then
+            checksum_file="SHA256SUMS-${{ matrix.platform }}.txt"
             if [ "${{ runner.os }}" = "Windows" ]; then
               # Windows PowerShell - simplified approach
-              powershell -Command "Get-ChildItem -File | ForEach-Object { \$hash = (Get-FileHash \$_.Name -Algorithm SHA256).Hash; \"\$hash  \$_.Name\" | Add-Content -Path SHA256SUMS.txt }"
+              powershell -Command "Get-ChildItem -File | ForEach-Object { \$hash = (Get-FileHash \$_.Name -Algorithm SHA256).Hash; \"\$hash  \$_.Name\" | Add-Content -Path $checksum_file }"
             else
               # Linux/macOS
               for binary in *; do
                 if [ -f "$binary" ]; then
-                  sha256sum "$binary" >> SHA256SUMS.txt
+                  sha256sum "$binary" >> "$checksum_file"
                 fi
               done
             fi
             echo "Checksums created:"
-            cat SHA256SUMS.txt 2>/dev/null || echo "No checksums file created"
+            cat "$checksum_file" 2>/dev/null || echo "No checksums file created"
           else
             echo "No binaries found to create checksums for"
           fi
