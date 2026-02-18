@@ -115,6 +115,12 @@ class ArtifactCollector
     http.use_ssl = true if uri.scheme == 'https'
 
     request = Net::HTTP::Get.new(uri.request_uri)
+    # Add headers to match typical GitHub API client
+    request['User-Agent'] = 'Octokit Ruby Gem'
+    request['Accept'] = 'application/vnd.github.v3+json'
+    # Add authorization token if available (though SAS token should be enough)
+    request['Authorization'] = "token #{@client.access_token}" if @client.access_token
+
     response = http.request(request)
 
     raise "Download failed: #{response.code} #{response.message}" unless response.is_a?(Net::HTTPSuccess)
