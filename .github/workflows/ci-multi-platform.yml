@@ -126,9 +126,18 @@ jobs:
             ext=""
           fi
 
-          cp bin/crystal_search$ext dist/${{ matrix.platform }}/ 2>/dev/null || echo "crystal_search$ext not found"
-          cp bin/find_shard$ext dist/${{ matrix.platform }}/ 2>/dev/null || echo "find_shard$ext not found"
-          cp bin/crystal_doc$ext dist/${{ matrix.platform }}/ 2>/dev/null || echo "crystal_doc$ext not found"
+          echo "Bin directory contents:"
+          ls -la bin/
+
+          for binary in crystal_search find_shard crystal_doc; do
+            src="bin/$binary$ext"
+            if [ -f "$src" ]; then
+              cp "$src" dist/${{ matrix.platform }}/
+              echo "Copied $src"
+            else
+              echo "Warning: $src not found"
+            fi
+          done
 
           # Create checksums for any binaries that exist
           cd dist/${{ matrix.platform }}
@@ -165,7 +174,7 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.test.result == 'success'
     permissions:
       contents: write
       actions: read
@@ -240,6 +249,7 @@ jobs:
             --tag "${{ steps.tag.outputs.tag }}" \
             --name "Release ${{ steps.tag.outputs.tag }}" \
             --artifacts ./artifacts \
+            --pattern '**/*' \
             --prerelease ${{ steps.prerelease.outputs.prerelease }} \
             --token ${{ secrets.GITHUB_TOKEN }}
           echo "Release created successfully"
@@ -247,8 +257,7 @@ jobs:
       - name: Verify release
         run: |
           gh release view "${{ steps.tag.outputs.tag }}" \
-            --repo ${{ github.repository }} \
-            --token ${{ secrets.GITHUB_TOKEN }}
+            --repo ${{ github.repository }}
 
       - name: Notify success
         if: success()
