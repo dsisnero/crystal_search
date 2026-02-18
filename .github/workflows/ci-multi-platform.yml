@@ -192,18 +192,29 @@ jobs:
             echo "Detected stable release tag"
           fi
 
-      - name: Collect artifacts from workflow run
-        id: artifacts
-        run: |
-          mkdir -p ./artifacts
-          echo "Collecting artifacts from workflow run ${{ github.run_id }}"
-          ruby scripts/collect_artifacts.rb \
-            --repo ${{ github.repository }} \
-            --workflow-run ${{ github.run_id }} \
-            --platforms linux,macos,windows \
-            --token ${{ secrets.GITHUB_TOKEN }} \
-            --output-dir ./artifacts
-          ls -la ./artifacts/
+      - name: Create artifacts directory
+        run: mkdir -p ./artifacts
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: crystal_search-binaries-linux-x86_64
+          path: ./artifacts/linux
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: crystal_search-binaries-macos-arm64
+          path: ./artifacts/macos
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: crystal_search-binaries-windows-x64
+          path: ./artifacts/windows
+
+      - name: List artifacts
+        run: ls -la ./artifacts/ && find ./artifacts -type f
 
       - name: Create GitHub release
         id: create_release
