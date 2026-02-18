@@ -46,7 +46,8 @@ class ArtifactCollector
   # @param workflow_run_id [Integer] Workflow run ID
   # @return [Array<Hash>] List of artifact metadata
   def list_artifacts(repo, workflow_run_id)
-    artifacts = @client.workflow_run_artifacts(repo, workflow_run_id)
+    response = @client.workflow_run_artifacts(repo, workflow_run_id)
+    artifacts = response.artifacts
     artifacts.map do |artifact|
       {
         id: artifact.id,
