@@ -34,31 +34,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Crystal
+      - name: Install Crystal (Linux)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            # Install using official Crystal repository
-            curl -fsSL https://crystal-lang.org/install.sh | sudo bash -s -- --version=latest
-            # Verify installation
-            crystal --version
-            shards --version
-          elif [ "${{ runner.os }}" = "macOS" ]; then
-            brew update
-            brew install crystal shards
-            crystal --version
-            shards --version
-          elif [ "${{ runner.os }}" = "Windows" ]; then
-            # Use official Crystal Windows installer via PowerShell
-            powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -Uri https://crystal-lang.org/install.ps1 -UseBasicParsing | iex"
-            # Refresh PATH (PowerShell)
-            powershell -Command "\$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')"
-            crystal --version
-            shards --version
-          else
-            echo "Unsupported OS: ${{ runner.os }}"
-            exit 1
-          fi
+          # Install using official Crystal repository
+          curl -fsSL https://crystal-lang.org/install.sh | sudo bash -s -- --version=latest
+          # Verify installation
+          crystal --version
+          shards --version
+
+      - name: Install Crystal (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew update
+          brew install crystal shards openssl pkg-config
+          crystal --version
+          shards --version
+
+      - name: Install Crystal (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # Use official Crystal Windows installer via PowerShell
+          powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -Uri https://crystal-lang.org/install.ps1 -UseBasicParsing | iex"
+          # Refresh PATH (PowerShell)
+          powershell -Command "\$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')"
+          crystal --version
+          shards --version
 
       - name: Cache shards
         uses: actions/cache@v4
