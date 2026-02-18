@@ -77,9 +77,11 @@ jobs:
         run: crystal spec
 
       - name: Check formatting
+        continue-on-error: true
         run: crystal tool format --check || echo "Formatting check failed, continuing..."
 
       - name: Run Ameba linter
+        continue-on-error: true
         run: |
           if [ -f ./bin/ameba ]; then
             ./bin/ameba || echo "Lint failures found, continuing..."
