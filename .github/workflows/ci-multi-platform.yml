@@ -78,10 +78,12 @@ jobs:
 
       - name: Check formatting
         continue-on-error: true
+        shell: bash
         run: crystal tool format --check || echo "Formatting check failed, continuing..."
 
       - name: Run Ameba linter
         continue-on-error: true
+        shell: bash
         run: |
           if [ -f ./bin/ameba ]; then
             ./bin/ameba || echo "Lint failures found, continuing..."
@@ -93,6 +95,7 @@ jobs:
         run: shards build --release
 
       - name: Test built binaries
+        shell: bash
         run: |
           for binary in crystal_search find_shard crystal_doc; do
             if [ -f "bin/$binary" ]; then
@@ -104,6 +107,7 @@ jobs:
           done
 
       - name: Create artifact directory
+        shell: bash
         run: |
           mkdir -p dist/${{ matrix.platform }}
           # Copy built binaries (skip if missing)
