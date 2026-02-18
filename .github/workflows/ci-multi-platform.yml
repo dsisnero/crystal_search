@@ -55,16 +55,9 @@ jobs:
 
       - name: Install Crystal (Windows)
         if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          # Install scoop package manager
-          echo "Installing scoop package manager..."
-          powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; irm get.scoop.sh | iex"
-          # Install Crystal via scoop
-          scoop install crystal
-          # Refresh PATH
-          crystal --version
-          shards --version
+        uses: crystal-lang/install-crystal@v1
+        with:
+          crystal_version: latest
 
       - name: Cache shards
         uses: actions/cache@v4
