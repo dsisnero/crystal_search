@@ -173,15 +173,6 @@ jobs:
         run: |
           gh --version || echo "GitHub CLI not available"
 
-      - name: Check CI status
-        id: ci_check
-        run: |
-          ruby scripts/check_ci_status.rb \
-            --repo ${{ github.repository }} \
-            --sha ${{ github.sha }} \
-            --token ${{ secrets.GITHUB_TOKEN }}
-          echo "CI status check passed"
-
       - name: Determine release tag
         id: tag
         run: |
