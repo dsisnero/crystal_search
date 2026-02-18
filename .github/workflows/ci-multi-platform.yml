@@ -57,17 +57,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          # Try official Crystal Windows installer via PowerShell first
-          echo "Attempting to install Crystal using official installer..."
-          powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -Uri https://crystal-lang.org/install.ps1 -UseBasicParsing | iex" || {
-            echo "Official installer failed, trying Chocolatey as fallback..."
-            # Install Chocolatey if not present
-            powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
-            # Install Crystal via Chocolatey
-            choco install crystal -y
-          }
-          # Refresh PATH (PowerShell)
-          powershell -Command "\$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')"
+          # Install scoop package manager
+          echo "Installing scoop package manager..."
+          powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; irm get.scoop.sh | iex"
+          # Install Crystal via scoop
+          scoop install crystal
+          # Refresh PATH
           crystal --version
           shards --version
 
