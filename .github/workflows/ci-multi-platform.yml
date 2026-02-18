@@ -49,8 +49,10 @@ jobs:
             crystal --version
             shards --version
           elif [ "${{ runner.os }}" = "Windows" ]; then
-            # Use Chocolatey for Windows (may be older version)
-            choco install crystal shards
+            # Use official Crystal Windows installer via PowerShell
+            powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -Uri https://crystal-lang.org/install.ps1 -UseBasicParsing | iex"
+            # Refresh PATH
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
             crystal --version
             shards --version
           else
