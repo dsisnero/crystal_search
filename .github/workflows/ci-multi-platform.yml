@@ -97,12 +97,20 @@ jobs:
       - name: Test built binaries
         shell: bash
         run: |
+          # Determine binary extension based on platform
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ext=".exe"
+          else
+            ext=""
+          fi
+
           for binary in crystal_search find_shard crystal_doc; do
-            if [ -f "bin/$binary" ]; then
+            binary_path="bin/$binary$ext"
+            if [ -f "$binary_path" ]; then
               echo "Testing $binary..."
-              ./bin/$binary --help || ./bin/$binary --version || echo "$binary test completed"
+              ./$binary_path --help || ./$binary_path --version || echo "$binary test completed"
             else
-              echo "Warning: bin/$binary not found"
+              echo "Warning: $binary_path not found"
             fi
           done
 
@@ -111,9 +119,16 @@ jobs:
         run: |
           mkdir -p dist/${{ matrix.platform }}
           # Copy built binaries (skip if missing)
-          cp bin/crystal_search dist/${{ matrix.platform }}/ 2>/dev/null || echo "crystal_search not found"
-          cp bin/find_shard dist/${{ matrix.platform }}/ 2>/dev/null || echo "find_shard not found"
-          cp bin/crystal_doc dist/${{ matrix.platform }}/ 2>/dev/null || echo "crystal_doc not found"
+          # Determine binary extension based on platform
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ext=".exe"
+          else
+            ext=""
+          fi
+
+          cp bin/crystal_search$ext dist/${{ matrix.platform }}/ 2>/dev/null || echo "crystal_search$ext not found"
+          cp bin/find_shard$ext dist/${{ matrix.platform }}/ 2>/dev/null || echo "find_shard$ext not found"
+          cp bin/crystal_doc$ext dist/${{ matrix.platform }}/ 2>/dev/null || echo "crystal_doc$ext not found"
 
           # Create checksums for any binaries that exist
           cd dist/${{ matrix.platform }}
