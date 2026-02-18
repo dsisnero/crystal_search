@@ -37,13 +37,21 @@ jobs:
       - name: Install Crystal
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
-            sudo apt-get update
-            sudo apt-get install -y crystal libssl-dev
+            # Install using official Crystal repository
+            curl -fsSL https://crystal-lang.org/install.sh | sudo bash -s -- --version=latest
+            # Verify installation
+            crystal --version
+            shards --version
           elif [ "${{ runner.os }}" = "macOS" ]; then
             brew update
-            brew install crystal
+            brew install crystal shards
+            crystal --version
+            shards --version
           elif [ "${{ runner.os }}" = "Windows" ]; then
-            choco install crystal
+            # Use Chocolatey for Windows (may be older version)
+            choco install crystal shards
+            crystal --version
+            shards --version
           else
             echo "Unsupported OS: ${{ runner.os }}"
             exit 1
